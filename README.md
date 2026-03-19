@@ -26,7 +26,7 @@ npm install
 ### 3. Setup Environment
 
 ```bash
-VITE_API_URL=http://localhost:8000/api
+VITE_API_URL=http://localhost:8000
 ```
 
 ### 4. Run Server
