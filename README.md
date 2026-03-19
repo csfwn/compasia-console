@@ -14,16 +14,22 @@ Built using **Vue 3 + TypeScript + Vite**, the console provides a clean and resp
 
 ```bash
 git clone <your-repo-url>
-cd <frontend-folder>
+cd project-folder
 ```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
+### 3. Setup Environment
+
 ```bash
 VITE_API_URL=http://localhost:8000/api
 ```
+
+### 4. Run Server
 
 ```bash
 npm run dev
