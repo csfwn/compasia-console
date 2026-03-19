@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useProductStore } from "@/stores/productMaster";
 import { uploadFile } from "@/api/productMaster";
-
-// shadcn
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "vue-sonner";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-vue-next";
+
 import {
   Table,
   TableBody,
@@ -16,9 +16,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
 const store = useProductStore();
 
 const search = ref("");
+const debouncedSearch = ref("");
+let debounceTimer: any = null;
+
+const sort = ref("");
 const page = ref(1);
 const file = ref<File | null>(null);
 const fileInputKey = ref(0);
@@ -32,18 +44,78 @@ const fetchData = async () => {
     page: page.value,
   };
 
-  if (search.value) {
-    params.search = search.value;
-  }
+  if (debouncedSearch.value) params.search = debouncedSearch.value;
+  if (sort.value) params.sort = sort.value;
 
   await store.fetchProducts(params);
+};
+
+const handleSort = (column: string) => {
+  if (!sort.value) {
+    sort.value = `${column}|asc`;
+  } else {
+    const [currentCol, currentDir] = sort.value.split("|");
+
+    if (currentCol === column) {
+      sort.value = `${column}|${currentDir === "asc" ? "desc" : "asc"}`;
+    } else {
+      sort.value = `${column}|asc`;
+    }
+  }
+
+  page.value = 1;
+  fetchData();
+};
+
+const getSortState = (column: string) => {
+  if (!sort.value) return "none";
+
+  const [currentCol, currentDir] = sort.value.split("|");
+
+  if (currentCol !== column) return "none";
+
+  return currentDir;
+};
+
+const isActiveSort = (column: string) => {
+  return sort.value.startsWith(column);
+};
+
+watch(search, (val) => {
+  clearTimeout(debounceTimer);
+
+  debounceTimer = setTimeout(() => {
+    debouncedSearch.value = val;
+    page.value = 1;
+    fetchData();
+  }, 400);
+});
+
+const goToPage = (p: number) => {
+  page.value = p;
+  fetchData();
+};
+
+const nextPage = () => {
+  const last = store.products?.meta?.last_page || 1;
+
+  if (page.value < last) {
+    page.value++;
+    fetchData();
+  }
+};
+
+const prevPage = () => {
+  if (page.value > 1) {
+    page.value--;
+    fetchData();
+  }
 };
 
 const startPolling = () => {
   if (pollingInterval) return;
 
   isPolling.value = true;
-
   lastSnapshot = JSON.stringify(store.products.data || []);
 
   pollingInterval = setInterval(async () => {
@@ -56,7 +128,6 @@ const startPolling = () => {
     }
 
     lastSnapshot = currentSnapshot;
-
   }, 3000);
 };
 
@@ -84,36 +155,15 @@ const handleUpload = async () => {
     formData.append("file", file.value);
 
     const res = await uploadFile(formData);
-    const message = res.data?.message || "Upload success";
 
-    toast.success(message);
+    toast.success(res.data?.message || "Upload success");
 
     file.value = null;
     fileInputKey.value++;
 
     startPolling();
-
   } catch (error: any) {
-    const msg =
-      error?.response?.data?.message || "Upload failed";
-
-    toast.error(msg);
-  }
-};
-
-const nextPage = () => {
-  const lastPage = store.products?.meta?.last_page || 1;
-
-  if (page.value < lastPage) {
-    page.value++;
-    fetchData();
-  }
-};
-
-const prevPage = () => {
-  if (page.value > 1) {
-    page.value--;
-    fetchData();
+    toast.error(error?.response?.data?.message || "Upload failed");
   }
 };
 
@@ -125,42 +175,57 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto p-4 space-y-4 mt-15">
+  <div class="max-w-5xl mx-auto p-5 space-y-4 mt-5">
+
     <div class="flex items-center gap-3">
       <Input :key="fileInputKey" type="file" class="max-w-sm" @change="handleFileChange" />
-
-      <Button size="sm" @click="handleUpload">
-        Upload
-      </Button>
+      <Button size="sm" @click="handleUpload"> Upload </Button>
     </div>
-    <hr class="my-2" />
+
+    <hr />
+
     <div class="flex justify-between items-center">
       <h3 class="text-md font-medium">Product Master List</h3>
-
-      <div class="flex items-center gap-2 text-sm">
-        <span>Search:</span>
-        <Input v-model="search" class="w-36 h-8" @input="fetchData" />
-      </div>
+      <Input v-model="search" placeholder="Search" class="w-40 h-8" />
     </div>
 
-    <!-- Table -->
     <div class="border rounded-md overflow-hidden text-sm">
       <Table>
         <TableHeader>
           <TableRow class="bg-gray-100">
-            <TableHead class="w-12">No.</TableHead>
-            <TableHead>Product ID</TableHead>
-            <TableHead>Types</TableHead>
-            <TableHead>Brand</TableHead>
-            <TableHead>Model</TableHead>
-            <TableHead>Capacity</TableHead>
-            <TableHead class="text-center">Quantity</TableHead>
+
+            <TableHead v-for="col in [
+              { key: 'id', label: 'ID' },
+              { key: 'product_id', label: 'Product ID' },
+              { key: 'type', label: 'Types' },
+              { key: 'brand', label: 'Brand' },
+              { key: 'model', label: 'Model' },
+              { key: 'capacity', label: 'Capacity' },
+              { key: 'quantity', label: 'Quantity', center: true },
+            ]" :key="col.key" @click="handleSort(col.key)" :class="[
+              'cursor-pointer select-none group',
+              col.center ? 'text-center' : '',
+              isActiveSort(col.key) ? 'text-black font-bold' : 'text-gray-800'
+            ]">
+              <div class="flex items-center gap-1 " :class="col.center ? 'justify-center' : ''">
+
+                <span>{{ col.label }}</span>
+
+                <span class="opacity-60 group-hover:opacity-100 transition">
+                  <ArrowUpDown v-if="getSortState(col.key) === 'none'" class="w-3.5 h-3.5" />
+                  <ArrowUp v-else-if="getSortState(col.key) === 'asc'" class="w-3.5 h-3.5 text-black" />
+                  <ArrowDown v-else class="w-3.5 h-3.5 text-black" />
+                </span>
+
+              </div>
+            </TableHead>
+
           </TableRow>
         </TableHeader>
 
         <TableBody>
-          <TableRow v-for="(item, index) in store.products.data" :key="item.id">
-            <TableCell>{{ index + 1 }}</TableCell>
+          <TableRow v-for="item in store.products.data" :key="item.id" class="hover:bg-gray-50 transition">
+            <TableCell>{{ item.id }}</TableCell>
             <TableCell>{{ item.product_id }}</TableCell>
             <TableCell>{{ item.type }}</TableCell>
             <TableCell>{{ item.brand }}</TableCell>
@@ -174,28 +239,22 @@ onUnmounted(() => {
       </Table>
     </div>
 
-    <!-- Footer -->
-    <div class="flex justify-between text-xs text-gray-500">
-      <span>
-        Showing {{ store.products.data?.length || 0 }} of
-        {{ store.products?.meta?.total || 0 }}
-      </span>
-
-      <div class="flex gap-1">
-        <Button size="sm" variant="outline" :disabled="page === 1 || isPolling" @click="prevPage">
-          Prev
-        </Button>
-
-        <Button size="sm" variant="outline">
-          {{ page }}
-        </Button>
-
-        <Button size="sm" variant="outline" :disabled="page >= (store.products?.meta?.last_page || 1) || isPolling"
-          @click="nextPage">
-          Next
-        </Button>
+    <div class="flex items-center justify-between mt-4"> 
+      <div class="text-sm text-gray-500"> Showing {{ store.products.data?.length || 0 }} of {{
+        store.products?.meta?.total || 0 }} </div> 
+      <div>
+        <Pagination :page="page" :items-per-page="store.products?.meta?.per_page" :total="store.products?.meta?.total">
+          <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
+            <PaginationPrevious @click="prevPage" :disabled="page === 1" />
+            <template
+              v-for="(item, index) in items" :key="index">
+              <PaginationItem v-if="item.type === 'page'" :value="item.value" :is-active="item.value === page"
+                @click="goToPage(item.value)"> {{ item.value }} </PaginationItem>
+            </template>
+            <PaginationNext @click="nextPage" :disabled="page >= (store.products?.meta?.last_page || 1)" />
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
-
   </div>
 </template>
