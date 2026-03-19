@@ -13,7 +13,7 @@ Built using **Vue 3 + TypeScript + Vite**, the console provides a clean and resp
 ### 1. Clone Project
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/csfwn/compasia-console.git
 cd project-folder
 ```
 
