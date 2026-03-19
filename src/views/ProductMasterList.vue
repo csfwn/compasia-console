@@ -179,7 +179,9 @@ onUnmounted(() => {
 
     <div class="flex items-center gap-3">
       <Input :key="fileInputKey" type="file" class="max-w-sm" @change="handleFileChange" />
-      <Button size="sm" @click="handleUpload"> Upload </Button>
+      <Button size="sm" class="cursor-pointer hover:opacity-80" @click="handleUpload">
+        Upload
+      </Button>
     </div>
 
     <hr />
@@ -239,15 +241,14 @@ onUnmounted(() => {
       </Table>
     </div>
 
-    <div class="flex items-center justify-between mt-4"> 
+    <div class="flex items-center justify-between mt-4">
       <div class="text-sm text-gray-500"> Showing {{ store.products.data?.length || 0 }} of {{
-        store.products?.meta?.total || 0 }} </div> 
+        store.products?.meta?.total || 0 }} </div>
       <div>
         <Pagination :page="page" :items-per-page="store.products?.meta?.per_page" :total="store.products?.meta?.total">
           <PaginationContent v-slot="{ items }" class="flex items-center gap-1">
             <PaginationPrevious @click="prevPage" :disabled="page === 1" />
-            <template
-              v-for="(item, index) in items" :key="index">
+            <template v-for="(item, index) in items" :key="index">
               <PaginationItem v-if="item.type === 'page'" :value="item.value" :is-active="item.value === page"
                 @click="goToPage(item.value)"> {{ item.value }} </PaginationItem>
             </template>
