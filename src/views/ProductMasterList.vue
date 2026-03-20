@@ -24,6 +24,14 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
 const store = useProductStore();
 
 const search = ref("");
@@ -38,6 +46,9 @@ const fileInputKey = ref(0);
 let pollingInterval: any = null;
 const isPolling = ref(false);
 let lastSnapshot = "";
+
+const openDialog = ref(false);
+const isUploading = ref(false);
 
 const fetchData = async () => {
   const params: any = {
@@ -149,8 +160,15 @@ const handleUpload = async () => {
     toast.error("Please upload file");
     return;
   }
+  openDialog.value = true;
+};
+
+const confirmUpload = async () => {
+  if (!file.value) return;
 
   try {
+    isUploading.value = true;
+
     const formData = new FormData();
     formData.append("file", file.value);
 
@@ -161,9 +179,13 @@ const handleUpload = async () => {
     file.value = null;
     fileInputKey.value++;
 
+    openDialog.value = false;
+
     startPolling();
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Upload failed");
+  } finally {
+    isUploading.value = false;
   }
 };
 
@@ -258,4 +280,31 @@ onUnmounted(() => {
       </div>
     </div>
   </div>
+  <Dialog v-model:open="openDialog">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Confirm Upload</DialogTitle>
+      </DialogHeader>
+
+      <div class="text-sm text-gray-600 space-y-2">
+        <p>Are you sure you want to upload this file?</p>
+
+        <div v-if="file" class="bg-gray-100 px-3 py-2 rounded text-xs text-gray-800">
+          📄 {{ file.name }}
+        </div>
+      </div>
+
+      <DialogFooter class="mt-4 flex justify-end gap-2">
+        <Button variant="outline" @click="openDialog = false" :disabled="isUploading"
+          class="cursor-pointer hover:opacity-80">
+          Cancel
+        </Button>
+
+        <Button @click="confirmUpload" :disabled="isUploading" class="cursor-pointer hover:opacity-80">
+          <span v-if="isUploading">Uploading...</span>
+          <span v-else>Confirm</span>
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
